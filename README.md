@@ -39,23 +39,59 @@ on Azure, and serves a star schema to Power BI for funnel analytics.
 | Layer  | Purpose | Key operations |
 |--------|---------|----------------|
 | **Bronze** | Raw events, exactly as received | Append-only ingest from Event Hubs, schema-on-read, checkpointed |
-| **Silver** | Cleaned, validated, deduplicated | Dedup on `event_id`, type casting, timestamp parsing, quality filters |
-| **Gold**   | Analytics-ready star schema | Incremental MERGE loads, surrogate keys, SCD Type 2 on customer dimension |
+| **Silver** | Cleaned, validated, deduplicated | timestamp parsing, quality filters |
+| **Gold**   | Analytics-ready star schema | Incremental MERGE loads, surrogate keys, SCD Type 2 |
 
 ### Gold Star Schema
 
 ```
-                 ┌────────────────┐
-                 │  dim_customer  │ (SCD Type 2)
-                 └───────┬────────┘
-                         │
-┌──────────────┐   ┌─────▼─────────┐   ┌──────────────┐
-│  dim_product │───│  fact_events  │───│   dim_date   │
-└──────────────┘   └─────┬─────────┘   └──────────────┘
-                         │
-                 ┌───────▼────────┐
-                 │  dim_device    │
-                 └────────────────┘
+Fact Events
+        ┌────────────────┐             ┌──────────────┐
+        │  dim_browser   │             │   dim_date   │
+        └────────────────┘             └──────────────┘
+                │                              │
+                └──────────┐      ┌────────────┘
+                           │      │
+┌──────────────┐       ┌───────────────┐       ┌──────────────┐
+│  dim_country │───────│  fact_events  │───────│  dim_device  │
+└──────────────┘       └───────────────┘       └──────────────┘
+                        |      |       |
+             ┌──────────┘      |       └───────────┐
+             |                 |                   |
+    ┌────────────────┐ ┌────────────────┐   ┌──────────────┐
+    │  dim_referrer  │ │  dim_product   │   │   dim_os     │
+    └────────────────┘ └────────────────┘   └──────────────┘
+
+
+Fact Orders
+
+┌──────────────┐       ┌───────────────┐       ┌──────────────┐       ┌──────────────┐
+│  dim_country │───────│  fact_orders  │───────│  dim_product │───────│ dim_category │
+└──────────────┘       └───────────────┘       └──────────────┘       └──────────────┘
+                          |      
+               ┌──────────┘       
+               |                     
+        ┌────────────────┐ 
+        │  dim_date      │ 
+        └────────────────┘ 
+
+Fact Sessions
+
+        ┌────────────────┐             ┌──────────────┐
+        │  dim_browser   │             │   dim_date   │
+        └────────────────┘             └──────────────┘
+                │                              │
+                └──────────┐      ┌────────────┘
+                           │      │
+┌──────────────┐       ┌───────────────┐       ┌──────────────┐
+│  dim_country │───────│ fact_sessions │───────│  dim_device  │
+└──────────────┘       └───────────────┘       └──────────────┘
+                          |        |
+               ┌──────────┘        └───────────┐
+               |                               |
+        ┌────────────────┐             ┌──────────────┐
+        │  dim_referrer  │             │   dim_os     │
+        └────────────────┘             └──────────────┘
 ```
 
 ---
@@ -71,7 +107,7 @@ page_view ──▶ product_view ──▶ add_to_cart ──▶ checkout ──
 ```
 
 Each event includes: `event_id` (UUID, dedup key), `session_id`, `user_id`,
-`event_type`, `product_id`, `event_timestamp`, `device`, `referrer`.
+`event_type`, `product_id`, `event_timestamp`, `device`, `referrer`, `browser`, `os`, `country`, `referrer`,`category`, `revenue`.
 
 The generator intentionally embeds behavioral biases (e.g., device and referrer
 affect conversion) so downstream analytics — and the future ML model — have
@@ -99,37 +135,6 @@ Planned/included analyses:
 - Session behavior trends over time
 - Top products by views vs. purchases
 
-*(Screenshots / demo video will be added here.)*
-
----
-
-## 🚀 Setup & Run
-
-### Prerequisites
-- Azure subscription (Event Hubs + ADLS Gen2 storage account)
-- Databricks workspace (or Free Edition)
-- Power BI Desktop
-
-### 1. Generate events
-```bash
-pip install -r requirements.txt
-python generator/produce_events.py --events-per-run 5000
-```
-
-### 2. Run the pipeline
-Databricks notebooks in `/notebooks`, run in order (or via the included Job):
-1. `01_bronze_ingest` — Event Hubs → bronze Delta (availableNow trigger)
-2. `02_silver_clean` — dedup, validate, conform
-3. `03_gold_dimensional` — SCD2 dimension merges + fact load
-4. `04_audits` — uniqueness, referential integrity & quality checks
-
-### 3. Connect Power BI
-Get Data → Azure Databricks → SQL Warehouse hostname + HTTP path → select
-gold tables → Import mode → model star schema relationships.
-
-💡 **Cost note:** All compute uses auto-stop / short-lived runs. The full
-pipeline runs comfortably within Azure free-tier credits.
-
 ---
 
 ## 🗺️ Roadmap
@@ -142,7 +147,6 @@ pipeline runs comfortably within Azure free-tier credits.
 - [ ] **ML: session conversion prediction** — predict purchase probability from
       early-session behavior; MLflow experiment tracking; batch scoring written
       back to gold for dashboard consumption
-- [ ] CI/CD for notebooks (GitHub Actions)
 
 ---
 
@@ -151,13 +155,16 @@ pipeline runs comfortably within Azure free-tier credits.
 ```
 ├── generator/            # Faker-based event producer
 ├── notebooks/            # Databricks pipeline notebooks
-├── sql/                  # Gold DDL & analytical queries
 ├── docs/                 # Architecture diagrams, screenshots
 └── README.md
 ```
 
 ---
 
-## 👤 Author
+## Author
 
-**[Your Name]** — [LinkedIn](#) · [Portfolio](#)
+Nqobile Msibi
+
+Data Engineer | Data Analyst | Analytics Engineer | Cloud Data Enthusiast
+
+- LinkedIn: https://www.linkedin.com/in/nqobile-msibi/
