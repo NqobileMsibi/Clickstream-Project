@@ -12,9 +12,9 @@ on Azure, and serves a star schema to Power BI for funnel analytics.
 
 ```
 ┌──────────────┐    ┌──────────────┐    ┌─────────────────────────────┐    ┌──────────────┐
-│ Python Event │───▶│ Azure Event  │───▶│   Azure Databricks          │───▶│   Power BI   │
+│ Python Event │────│ Azure Event  │────│   Azure Databricks          │────│   Power BI   │
 │  Generator   │    │    Hubs      │    │  Structured Streaming       │    │  (Import via │
-│   (Faker)    │    │              │    │  Bronze ─▶ Silver ─▶ Gold   │    │SQL Warehouse)│
+│   (Faker)    │    │              │    │  Bronze ─▶ Silver ─▶ Gold  │    │SQL Warehouse)│
 └──────────────┘    └──────────────┘    └─────────────────────────────┘    └──────────────┘
                                                       │
                                               Delta Lake tables on
